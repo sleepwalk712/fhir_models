@@ -27,23 +27,26 @@ module FHIR
       blank = ->(obj) { obj.respond_to?(:empty?) ? obj.empty? : obj.nil? }
       if thing.is_a?(Array)
         return nil if thing.empty?
-        thing.map! { |i| prune(i) }
-        thing.reject!(&blank)
+
+        thing
+          .map { |i| prune(i) }
+          .reject(&blank)
       elsif thing.is_a?(Hash)
         return {} if thing.empty?
+
+        new_thing = {}
         thing.each do |key, value|
-          thing[key] = prune(value)
+          new_thing[key] = prune(value) unless blank.call(value)
         end
-        thing.delete_if do |_key, value|
-          blank.call(value)
-        end
+        new_thing
+      else
+        thing
       end
-      thing
     end
 
-    def from_hash(hash)
+    def from_hash(original_hash)
       # eliminate empty stuff
-      hash = prune(hash) unless hash.empty?
+      pruned_hash = prune(original_hash) unless original_hash.empty?
       # clear the existing variables
       self.class::METADATA.each do |key, value|
         local_name = key
@@ -51,7 +54,8 @@ module FHIR
         instance_variable_set("@#{local_name}", nil)
       end
       # set the variables to the hash values
-      hash.each do |key, value|
+      pruned_hash&.each_key do |key|
+        value = original_hash[key]
         key = key.to_s
         meta = self.class::METADATA[key]
         next if meta.nil?
