@@ -5,6 +5,9 @@ module FHIR
     include FHIR::Xml
 
     SEARCH_PARAMS = ['code', 'context', 'context-quantity', 'context-type', 'date', 'definition', 'description', 'effective', 'identifier', 'jurisdiction', 'name', 'publisher', 'status', 'subject-type', 'title', 'url', 'version']
+    MULTIPLE_TYPES = {
+      'versionAlgorithm' => ['string', 'Coding']
+    }
     METADATA = {
       'id' => {'type'=>'id', 'path'=>'Questionnaire.id', 'min'=>0, 'max'=>1},
       'meta' => {'type'=>'Meta', 'path'=>'Questionnaire.meta', 'min'=>0, 'max'=>1},
@@ -16,7 +19,8 @@ module FHIR
       'modifierExtension' => {'type'=>'Extension', 'path'=>'Questionnaire.modifierExtension', 'min'=>0, 'max'=>Float::INFINITY},
       'url' => {'type'=>'uri', 'path'=>'Questionnaire.url', 'min'=>0, 'max'=>1},
       'identifier' => {'type'=>'Identifier', 'path'=>'Questionnaire.identifier', 'min'=>0, 'max'=>Float::INFINITY},
-      'version' => {'type'=>'string', 'path'=>'Questionnaire.version', 'min'=>0, 'max'=>1},
+      'versionAlgorithmString' => {'type'=>'string', 'path'=>'Questionnaire.versionAlgorithm[x]', 'min'=>0, 'max'=>1},
+      'versionAlgorithmCoding' => {'valid_codes'=>{'http://hl7.org/fhir/version-algorithm'=>['semver', 'integer', 'alpha', 'date', 'natural']}, 'type'=>'Coding', 'path'=>'Questionnaire.versionAlgorithm[x]', 'min'=>0, 'max'=>1, 'binding'=>{'strength'=>'extensible', 'uri'=>'http://hl7.org/fhir/ValueSet/version-algorithm'}},
       'name' => {'type'=>'string', 'path'=>'Questionnaire.name', 'min'=>0, 'max'=>1},
       'title' => {'type'=>'string', 'path'=>'Questionnaire.title', 'min'=>0, 'max'=>1},
       'derivedFrom' => {'type'=>'canonical', 'path'=>'Questionnaire.derivedFrom', 'min'=>0, 'max'=>Float::INFINITY},
@@ -31,6 +35,7 @@ module FHIR
       'jurisdiction' => {'type'=>'CodeableConcept', 'path'=>'Questionnaire.jurisdiction', 'min'=>0, 'max'=>Float::INFINITY, 'binding'=>{'strength'=>'extensible', 'uri'=>'http://hl7.org/fhir/ValueSet/jurisdiction'}},
       'purpose' => {'type'=>'markdown', 'path'=>'Questionnaire.purpose', 'min'=>0, 'max'=>1},
       'copyright' => {'type'=>'markdown', 'path'=>'Questionnaire.copyright', 'min'=>0, 'max'=>1},
+      'copyrightLabel' => {'type'=>'string', 'path'=>'Questionnaire.copyrightLabel', 'min'=>0, 'max'=>1},
       'approvalDate' => {'type'=>'date', 'path'=>'Questionnaire.approvalDate', 'min'=>0, 'max'=>1},
       'lastReviewDate' => {'type'=>'date', 'path'=>'Questionnaire.lastReviewDate', 'min'=>0, 'max'=>1},
       'effectivePeriod' => {'type'=>'Period', 'path'=>'Questionnaire.effectivePeriod', 'min'=>0, 'max'=>1},
@@ -55,10 +60,12 @@ module FHIR
         'type' => {'valid_codes'=>{'http://hl7.org/fhir/item-type'=>['group', 'display', 'boolean', 'decimal', 'integer', 'date', 'dateTime', 'time', 'string', 'text', 'url', 'choice', 'open-choice', 'attachment', 'reference', 'quantity']}, 'type'=>'code', 'path'=>'Item.type', 'min'=>1, 'max'=>1, 'binding'=>{'strength'=>'required', 'uri'=>'http://hl7.org/fhir/ValueSet/item-type'}},
         'enableWhen' => {'type'=>'Questionnaire::Item::EnableWhen', 'path'=>'Item.enableWhen', 'min'=>0, 'max'=>Float::INFINITY},
         'enableBehavior' => {'valid_codes'=>{'http://hl7.org/fhir/questionnaire-enable-behavior'=>['all', 'any']}, 'type'=>'code', 'path'=>'Item.enableBehavior', 'min'=>0, 'max'=>1, 'binding'=>{'strength'=>'required', 'uri'=>'http://hl7.org/fhir/ValueSet/questionnaire-enable-behavior'}},
+        'disabledDisplay' => {'valid_codes'=>{'http://hl7.org/fhir/questionnaire-disabled-display'=>['hidden', 'protected']}, 'type'=>'code', 'path'=>'Item.disabledDisplay', 'min'=>0, 'max'=>1, 'binding'=>{'strength'=>'required', 'uri'=>'http://hl7.org/fhir/ValueSet/questionnaire-disabled-display'}},
         'required' => {'type'=>'boolean', 'path'=>'Item.required', 'min'=>0, 'max'=>1},
         'repeats' => {'type'=>'boolean', 'path'=>'Item.repeats', 'min'=>0, 'max'=>1},
         'readOnly' => {'type'=>'boolean', 'path'=>'Item.readOnly', 'min'=>0, 'max'=>1},
         'maxLength' => {'type'=>'integer', 'path'=>'Item.maxLength', 'min'=>0, 'max'=>1},
+        'answerConstraint' => {'valid_codes'=>{'http://hl7.org/fhir/questionnaire-answer-constraint'=>['optionsOnly', 'optionsOrType', 'optionsOrString']}, 'type'=>'code', 'path'=>'Item.answerConstraint', 'min'=>0, 'max'=>1, 'binding'=>{'strength'=>'required', 'uri'=>'http://hl7.org/fhir/ValueSet/questionnaire-answer-constraint'}},
         'answerValueSet' => {'type'=>'canonical', 'path'=>'Item.answerValueSet', 'min'=>0, 'max'=>1},
         'answerOption' => {'type'=>'Questionnaire::Item::AnswerOption', 'path'=>'Item.answerOption', 'min'=>0, 'max'=>Float::INFINITY},
         'initial' => {'type'=>'Questionnaire::Item::Initial', 'path'=>'Item.initial', 'min'=>0, 'max'=>Float::INFINITY},
@@ -195,46 +202,50 @@ module FHIR
       attr_accessor :type              # 1-1 code
       attr_accessor :enableWhen        # 0-* [ Questionnaire::Item::EnableWhen ]
       attr_accessor :enableBehavior    # 0-1 code
+      attr_accessor :enableDisplay     # 0-1 code
       attr_accessor :required          # 0-1 boolean
       attr_accessor :repeats           # 0-1 boolean
       attr_accessor :readOnly          # 0-1 boolean
       attr_accessor :maxLength         # 0-1 integer
+      attr_accessor :answerConstraint  # 0-1 code
       attr_accessor :answerValueSet    # 0-1 canonical
       attr_accessor :answerOption      # 0-* [ Questionnaire::Item::AnswerOption ]
       attr_accessor :initial           # 0-* [ Questionnaire::Item::Initial ]
       attr_accessor :item              # 0-* [ Questionnaire::Item ]
     end
 
-    attr_accessor :id                # 0-1 id
-    attr_accessor :meta              # 0-1 Meta
-    attr_accessor :implicitRules     # 0-1 uri
-    attr_accessor :language          # 0-1 code
-    attr_accessor :text              # 0-1 Narrative
-    attr_accessor :contained         # 0-* [ Resource ]
-    attr_accessor :extension         # 0-* [ Extension ]
-    attr_accessor :modifierExtension # 0-* [ Extension ]
-    attr_accessor :url               # 0-1 uri
-    attr_accessor :identifier        # 0-* [ Identifier ]
-    attr_accessor :version           # 0-1 string
-    attr_accessor :name              # 0-1 string
-    attr_accessor :title             # 0-1 string
-    attr_accessor :derivedFrom       # 0-* [ canonical ]
-    attr_accessor :status            # 1-1 code
-    attr_accessor :experimental      # 0-1 boolean
-    attr_accessor :subjectType       # 0-* [ code ]
-    attr_accessor :date              # 0-1 dateTime
-    attr_accessor :publisher         # 0-1 string
-    attr_accessor :contact           # 0-* [ ContactDetail ]
-    attr_accessor :description       # 0-1 markdown
-    attr_accessor :useContext        # 0-* [ UsageContext ]
-    attr_accessor :jurisdiction      # 0-* [ CodeableConcept ]
-    attr_accessor :purpose           # 0-1 markdown
-    attr_accessor :copyright         # 0-1 markdown
-    attr_accessor :approvalDate      # 0-1 date
-    attr_accessor :lastReviewDate    # 0-1 date
-    attr_accessor :effectivePeriod   # 0-1 Period
-    attr_accessor :code              # 0-* [ Coding ]
-    attr_accessor :item              # 0-* [ Questionnaire::Item ]
+    attr_accessor :id                     # 0-1 id
+    attr_accessor :meta                   # 0-1 Meta
+    attr_accessor :implicitRules          # 0-1 uri
+    attr_accessor :language               # 0-1 code
+    attr_accessor :text                   # 0-1 Narrative
+    attr_accessor :contained              # 0-* [ Resource ]
+    attr_accessor :extension              # 0-* [ Extension ]
+    attr_accessor :modifierExtension      # 0-* [ Extension ]
+    attr_accessor :url                    # 0-1 uri
+    attr_accessor :identifier             # 0-* [ Identifier ]
+    attr_accessor :versionAlgorithmString # 0-1 string
+    attr_accessor :versionAlgorithmCoding # 0-1 Coding
+    attr_accessor :name                   # 0-1 string
+    attr_accessor :title                  # 0-1 string
+    attr_accessor :derivedFrom            # 0-* [ canonical ]
+    attr_accessor :status                 # 1-1 code
+    attr_accessor :experimental           # 0-1 boolean
+    attr_accessor :subjectType            # 0-* [ code ]
+    attr_accessor :date                   # 0-1 dateTime
+    attr_accessor :publisher              # 0-1 string
+    attr_accessor :contact                # 0-* [ ContactDetail ]
+    attr_accessor :description            # 0-1 markdown
+    attr_accessor :useContext             # 0-* [ UsageContext ]
+    attr_accessor :jurisdiction           # 0-* [ CodeableConcept ]
+    attr_accessor :purpose                # 0-1 markdown
+    attr_accessor :copyright              # 0-1 markdown
+    attr_accessor :copyrightLabel         # 0-1 string
+    attr_accessor :approvalDate           # 0-1 date
+    attr_accessor :lastReviewDate         # 0-1 date
+    attr_accessor :effectivePeriod        # 0-1 Period
+    attr_accessor :code                   # 0-* [ Coding ]
+    attr_accessor :item                   # 0-* [ Questionnaire::Item ]
 
     def resourceType
       'Questionnaire'
